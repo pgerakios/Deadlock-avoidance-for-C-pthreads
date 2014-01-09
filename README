@@ -1,0 +1,43 @@
+
+This tool has been originally developed by 
+Prodromos Gerakios and has been extended by 
+Panagiotis Vekris. All rights reserved.
+
+This is a Deadlock Avoidance Tool for C with Pthreads
+
+====================================================
+COMPILE
+----------------------------------------------------
+cd cil; ./configure; make 
+cd ../runtime; make
+cd ..; ./configure; make
+
+====================================================
+RUN / TEST
+-----------------------------------------------------
+To run a simple program:
+./run.sh [output file] [source file]
+
+To run a project with multiple sources, you have to 
+define the folders in which the directories are (at 
+least one directory):
+./run_dir.sh [output file] [source folder] <more source folders>
+ 
+
+You can define the debug flag DEBUG.
+Possible values: -debug and -ddebug (more detail).
+Example: DEBUG=-debug ./run.sh source.c output
+------------------------------------------------------
+To test / run all projects in the nulltests directory:
+cd nulltests; make; make run
+
+To clean output files in the nulltests directory:
+make clean
+------------------------------------------------------
+
+The modified version of the source is outputed in 
+$(ROOT)/ciltrees/gen/[source file name]
+
+
+
+

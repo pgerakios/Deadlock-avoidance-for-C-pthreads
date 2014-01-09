@@ -1,0 +1,45 @@
+#!/bin/sh
+
+if [ -z "$1" ] ; then
+   echo "Usage: ./lock_count.sh [source file]" 
+   exit -1
+fi   
+
+DUMPDIR=$PWD
+RELAYROOT=$PWD
+
+file=$1
+shift
+
+DETAIL_LEVEL='1'
+#DEBUG_FLAG=`make -s -C $RELAYROOT/runtime print_debug_flag`
+rm -r -f $DUMPDIR/tmp $DUMPDIR/dot $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/tmp/src
+mkdir -p $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/dot
+
+echo "Processing file: $file"
+echo "CPP options: $@"
+echo "DEBUG FLAG: $DEBUG_FLAG"
+
+gcc $@ $DEBUG_FLAG -D_GNU_SOURCES -include $RELAYROOT/runtime/runtime.h -E $file -o $DUMPDIR/tmp/`basename $file`
+
+if [ $? -eq 0 ] ; then
+	echo "Preprocessing [OK]"
+else
+	echo "Preprocessing [FAILED]"
+	exit 1
+fi
+
+echo "$RELAYROOT/scripts/duppy $DUMPDIR/tmp/`basename $file`" > $RELAYROOT/gcc-log.txt
+
+OCAMLRUNPARAM="b1" $RELAYROOT/scripts/dump-with-stats.sh > /dev/null
+if [ $? -eq 0 ] ; then
+	echo "First pass [OK]"
+else
+	echo "First pass [FAILED]"
+	exit 1
+fi
+
+OCAMLRUNPARAM="b1" $RELAYROOT/deadlock.exe -cg $DUMPDIR/ciltrees -cl 
+

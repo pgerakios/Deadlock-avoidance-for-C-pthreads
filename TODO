@@ -1,0 +1,23 @@
+
+TODO LIST
+---------
+
+1. 	Heap allocation in loop is not allowed.
+
+2.  Stack arrays should include local variables.
+
+3.  Consider arrays instead of hashtables for heap allocation. (?)
+
+4.  Write how the data flow works !!
+
+5.  Recursive effects - need to figure out what we're gonna do 
+
+6.  Check out what happens when formal params don't match the real.
+
+7.  Big offsets error
+
+8.  Do we need to take values passed as pointers in pthread_create into
+consideration, ex. to see if the new thread alters them.
+
+9.  In recursive functions, check if the function we are about to inline has an
+effect. If not, allow it.

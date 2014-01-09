@@ -1,0 +1,77 @@
+#!/bin/sh
+
+# This scripts runs the analysis for a whole project whithout the linking part.
+
+if [ -z "$1" ] ; then
+   echo "Usage: ./$0.sh [source directory]" 
+   exit -1
+fi   
+
+DUMPDIR=$PWD
+RELAYROOT=$PWD
+
+txtblk='\e[0;30m' # Black - Regular
+txtred='\e[0;31m' # Red
+txtgrn='\e[0;32m' # Green
+txtrst='\e[0m'
+
+num=$#
+arg=""
+for i in `seq 1 $num`
+do
+  arg="$arg $1/*.c"
+  shift
+done
+
+DETAIL_LEVEL='1'
+#DEBUG_FLAG=`make -s -C $RELAYROOT/runtime print_debug_flag`
+# It is CRUCIAL that ciltrees is empty, so that no alias.bin exists in the
+# beginning
+rm -r -f $DUMPDIR/tmp $DUMPDIR/dot $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/tmp/src
+mkdir -p $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/dot
+rm -r -f $RELAYROOT/gcc-log.txt
+
+echo "Processing files:"
+for f in $arg
+do
+#	echo "Preprocessing $f"
+#	echo "DEBUG FLAG: $DEBUG_FLAG"
+#	echo $PWD
+
+	gcc $DEBUG_FLAG $LFLAGS -D_GNU_SOURCES -include $RELAYROOT/runtime/runtime.h -E $f > $DUMPDIR/tmp/`basename $f`
+	if [ $? -eq 0 ] ; then
+    echo -e "${txtgrn}[ PREPROCESS OK ] $f${txtrst}"
+	else
+    echo -e "${txtred}[ PREPROCESS FAILED ] $f${txtrst}"
+    # Don't kill the entire analysis, just exempt the wrong files.
+#		exit 1
+	fi
+	if [ -f $RELAYROOT/gcc-log.txt ] ; then
+		echo "$RELAYROOT/scripts/duppy $DUMPDIR/tmp/`basename $f`" >> $RELAYROOT/gcc-log.txt
+	else
+		echo "$RELAYROOT/scripts/duppy $DUMPDIR/tmp/`basename $f`" > $RELAYROOT/gcc-log.txt
+	fi
+	
+done
+
+echo
+echo "DUMPING CALLGRAPH ..."
+
+OCAMLRUNPARAM="b1" $RELAYROOT/scripts/dump-with-stats.sh > /dev/null
+if [ $? -eq 0 ] ; then
+  echo -e "${txtgrn}[ DUMPING OK ]${txtrst}"
+else
+  echo -e "${txtred}[ DUMPING FAILED ]${txtrst}"
+	exit 2
+fi
+
+OCAMLRUNPARAM="b1,s=4M,i=32M,o=150" $RELAYROOT/deadlock_stats.exe -cg $DUMPDIR/ciltrees $DEBUG
+
+if [ $? -eq 0 ] ; then
+  echo -e "${txtgrn}[ ANALYSIS OK ]${txtrst}"
+else
+  echo -e "${txtred}[ ANALYSIS FAILED ]${txtrst}"
+  exit 3
+fi

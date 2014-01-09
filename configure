@@ -1,0 +1,26 @@
+#!/bin/bash
+
+repl_relayroot() {
+#tmp=/tmp/$RANDOM 
+awk -v pwd=$PWD '{
+  if($0~/^RELAYROOT=.*$/) {
+     printf "RELAYROOT=%s\n",pwd
+  } else {print $0}
+}' $1.template > $2.sh
+chmod +x $2.sh
+echo "Created $2.sh"
+# cp -f $tmp $1 
+# rm -f $tmp
+}
+
+repl_relayroot scripts/dump-calls scripts/dump-calls; 
+repl_relayroot scripts/dump-with-stats scripts/dump-with-stats;
+repl_relayroot scripts/merge scripts/merge;
+repl_relayroot scripts/run run;
+repl_relayroot scripts/run_dir run_dir;
+
+#PG: Please do not delete the following line
+repl_relayroot scripts/lock_count lock_count;
+repl_relayroot scripts/run_dir_test run_dir_test;
+
+repl_relayroot scripts/run_stats run_stats;

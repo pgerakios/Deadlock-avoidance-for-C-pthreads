@@ -1,0 +1,120 @@
+#!/bin/sh
+
+if [ -z "$1" ] ; then
+   echo "Usage: ./$0 [source directories]"
+   exit -1
+fi
+
+txtblk='\e[0;30m' # Black - Regular
+txtred='\e[0;31m' # Red
+txtgrn='\e[0;32m' # Green
+txtrst='\e[0m'
+
+DUMPDIR=$PWD
+CURROOT=$PWD
+DUMPROOT=$PWD/ciltrees
+DUPPYROOT=$RELAYROOT/scripts
+RELAYROOT=$PWD
+CILLYROOT=$RELAYROOT/cil/bin
+LOG=$DUMPROOT/log.txt
+
+
+export DUMPROOT
+export CILLYROOT
+export RELAYROOT
+export CURROOT
+
+case $1 in
+/*) execn=$1 ;;
+*) execn=$DUMPDIR/$1 ;;
+esac
+
+num=$#
+dirs=""
+arg=""
+for i in `seq 1 $num`
+do
+  dirs="$dirs $1"
+  arg="$arg $1/*.c"
+  shift
+done
+
+correct=0
+prepr_errors=0
+frontc_errors=0
+cil_errors=0
+
+DETAIL_LEVEL='1'
+#DEBUG_FLAG=`make -s -C $RELAYROOT/runtime print_debug_flag`
+# It is CRUCIAL that ciltrees is empty, so that no alias.bin exists in the
+# beginning
+rm -r -f $DUMPDIR/tmp $DUMPDIR/dot $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/tmp/src
+mkdir -p $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/dot
+rm -r -f $RELAYROOT/gcc-log.txt
+rm -f allocation.out
+echo -n "" > allocation.out #do not remove this
+
+for f in $arg
+do
+	gcc $DEBUG_FLAG $LFLAGS -D_GNU_SOURCES -w -E $f > $DUMPDIR/tmp/`basename $f`
+
+  if [ $? -eq 0 ] ; then
+    #hack: catch the error message in serr, but still 
+    serr=$($RELAYROOT/scripts/duppy_stats $DUMPDIR/tmp/`basename $f` \
+      2>&1 1> $(tty))
+#    $RELAYROOT/scripts/duppy_stats $DUMPDIR/tmp/`basename $f`
+    
+    case "$serr" in
+      *Frontc\.ParseError* )  
+          echo $serr
+          echo -e "${txtred}[ STATS FAILED ] $f${txtrst}"
+          (( frontc_errors++ ));;
+      *Errormsg\.Error* )
+          echo $serr
+          echo -e "${txtred}[ STATS FAILED ] $f${txtrst}"
+          (( cil_errors++ ));;
+      * ) 
+          echo -e "${txtgrn}[ OK ] $f${txtrst}"
+          (( correct++ ))
+    esac
+
+	else
+    echo -e "${txtred}[ PREPROCESS FAILED ] $f${txtrst}"
+    (( prepr_errors++ ))
+	fi
+done
+
+echo
+echo "Finished Preprocessing files"
+
+echo -e "${txtgrn}$correct\tanalyzed successfully ${txtrst}"
+if [ "$prepr_errors" -gt 0 ]
+then
+  echo -e "${txtred}$prepr_errors\tpreprocessor errors ${txtrst}"
+fi
+if [ "$frontc_errors" -gt 0 ]
+then
+  echo -e "${txtred}$frontc_errors\tfrontc errors ${txtrst}"
+fi
+if [ "$cil_errors" -gt 0 ]
+then
+  echo -e "${txtred}$cil_errors\tCIL errors ${txtrst}"
+fi
+
+echo -n "$correct $prepr_errors $frontc_errors $cil_errors " >> allocation.sum
+
+echo "{ sum0+= \$2; sum1+= \$3; sum2+= \$4; sum3+= \$5; sum4+= \$6; sum5+= \$7;sum6+= \$8}
+END { printf \"%d %d %d %d %d %d %d\n\", sum0,  sum1, sum2, sum3, sum4, sum5, sum6}" > \
+  $RELAYROOT/all.awk
+
+awk -f $RELAYROOT/all.awk < allocation.out >> allocation.sum  
+echo "Dumped results"
+
+rm $RELAYROOT/all.awk
+rm allocation.out
+if [ -e a.out ]
+then
+  rm a.out
+fi

@@ -1,0 +1,88 @@
+#!/bin/sh
+
+if [ -z "$1" ] ; then
+   echo "Usage: ./run_dir.sh [output file] [source directories]" 
+   exit -1
+fi   
+
+DUMPDIR=$PWD
+RELAYROOT=$PWD
+
+case $1 in
+/*) execn=$1 ;;
+*) execn=$DUMPDIR/$1 ;;
+esac
+#arg="$2/*.c" 
+num=$#
+arg=""
+shift
+for i in `seq 2 $num`
+do
+#  echo $1
+  arg="$arg $1/*.c"
+  shift
+done
+
+echo "======================="
+echo $arg
+
+DETAIL_LEVEL='1'
+#DEBUG_FLAG=`make -s -C $RELAYROOT/runtime print_debug_flag`
+# It is CRUCIAL that ciltrees is empty, so that no alias.bin exists in the
+# beginning
+rm -r -f $DUMPDIR/tmp $DUMPDIR/dot $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/tmp/src
+mkdir -p $DUMPDIR/ciltrees
+mkdir -p $DUMPDIR/dot
+rm -r -f $RELAYROOT/gcc-log.txt
+
+echo "Processing files:"
+for f in $arg
+do
+	#echo "CPP options: $@"
+	#echo "DEBUG FLAG: $DEBUG_FLAG"
+	#echo $PWD
+
+	gcc $DEBUG_FLAG $LFLAGS -D_GNU_SOURCES -include $RELAYROOT/runtime/runtime.h -E $f > $DUMPDIR/tmp/`basename $f`
+	if [ $? -eq 0 ] ; then
+  	echo "Preprocessing $f [OK]"
+	else
+  	echo "Preprocessing $f [FAILED]"
+		exit 1
+	fi
+	if [ -f $RELAYROOT/gcc-log.txt ] ; then
+		echo "$RELAYROOT/scripts/duppy $DUMPDIR/tmp/`basename $f`" >> $RELAYROOT/gcc-log.txt
+	else
+		echo "$RELAYROOT/scripts/duppy $DUMPDIR/tmp/`basename $f`" > $RELAYROOT/gcc-log.txt
+	fi
+	
+done
+
+echo "Preprocessing files [OK]"
+
+OCAMLRUNPARAM="b1" $RELAYROOT/scripts/dump-with-stats.sh > /dev/null
+if [ $? -eq 0 ] ; then
+	echo "First pass [OK]"
+else
+	echo "First pass [FAILED]"
+	exit 1
+fi
+
+OCAMLRUNPARAM="b1" $RELAYROOT/deadlock.exe -cg $DUMPDIR/ciltrees $DEBUG
+
+if [ $? -eq 0 ] ; then
+	echo "Analysis [OK]"
+	files=`ls -1 $DUMPDIR/ciltrees/gen/ | awk -v d=$DUMPDIR '{printf "%s/ciltrees/gen/%s ", d, $0}' | sed 's/\.c/\.o/g'`
+	echo "LINKING FILE(S): $files"
+  echo $LFLAGS
+
+	EXEC=$execn EXTOBJ=$files LFLAGS=$LFLAGS make -C $RELAYROOT/runtime link
+	if [ $? -eq 0 ] ; then
+		echo "Linking [OK]"
+	else
+		echo "Linking [FAILED]"
+		exit 1
+	fi
+else
+   echo "Analysis [FAILED]"
+fi
